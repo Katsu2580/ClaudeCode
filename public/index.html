@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>講座アンケート</title>
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+    background: #f5f6f8;
+    color: #1f2430;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  main {
+    width: 100%;
+    max-width: 480px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+  p.lead {
+    color: #5b6270;
+    margin-top: 0;
+    margin-bottom: 24px;
+    font-size: 0.9rem;
+  }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  label.field-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 0.92rem;
+  }
+  .field {
+    margin-bottom: 22px;
+  }
+  input[type="text"], textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d4d7de;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  textarea {
+    min-height: 110px;
+    resize: vertical;
+  }
+  .stars {
+    display: flex;
+    gap: 6px;
+  }
+  .stars input {
+    display: none;
+  }
+  .stars label {
+    font-size: 2rem;
+    cursor: pointer;
+    color: #d4d7de;
+    transition: color .15s;
+    user-select: none;
+  }
+  .stars label.active {
+    color: #f5a623;
+  }
+  button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #3d5afe;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  #msg {
+    margin-top: 14px;
+    font-size: 0.9rem;
+    min-height: 1.2em;
+  }
+  #msg.error { color: #d13438; }
+  #msg.success { color: #1a8754; }
+  .footer-link {
+    text-align: center;
+    margin-top: 18px;
+    font-size: 0.85rem;
+  }
+  .footer-link a { color: #3d5afe; }
+</style>
+</head>
+<body>
+<main>
+  <h1>講座の感想アンケート</h1>
+  <p class="lead">講座に参加いただきありがとうございました。感想をお聞かせください。</p>
+  <div class="card">
+    <form id="survey-form">
+      <div class="field">
+        <label class="field-label" for="nickname">ニックネーム</label>
+        <input type="text" id="nickname" name="nickname" maxlength="50" required placeholder="例: たろう">
+      </div>
+      <div class="field">
+        <label class="field-label">満足度</label>
+        <div class="stars" id="stars">
+          <input type="radio" name="satisfaction" value="1" id="s1"><label for="s1" data-val="1">★</label>
+          <input type="radio" name="satisfaction" value="2" id="s2"><label for="s2" data-val="2">★</label>
+          <input type="radio" name="satisfaction" value="3" id="s3"><label for="s3" data-val="3">★</label>
+          <input type="radio" name="satisfaction" value="4" id="s4"><label for="s4" data-val="4">★</label>
+          <input type="radio" name="satisfaction" value="5" id="s5"><label for="s5" data-val="5">★</label>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="comment">自由記述</label>
+        <textarea id="comment" name="comment" maxlength="2000" placeholder="ご自由にご記入ください"></textarea>
+      </div>
+      <button type="submit" id="submit-btn">送信する</button>
+      <div id="msg"></div>
+    </form>
+  </div>
+  <div class="footer-link"><a href="/results.html">これまでの回答一覧を見る →</a></div>
+</main>
+<script>
+  const starsWrap = document.getElementById('stars');
+  const starLabels = [...starsWrap.querySelectorAll('label')];
+  const radios = [...starsWrap.querySelectorAll('input')];
+
+  function paint(val) {
+    starLabels.forEach(l => {
+      l.classList.toggle('active', Number(l.dataset.val) <= val);
+    });
+  }
+  radios.forEach(r => r.addEventListener('change', () => paint(Number(r.value))));
+
+  const form = document.getElementById('survey-form');
+  const msg = document.getElementById('msg');
+  const btn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    msg.className = '';
+
+    const nickname = document.getElementById('nickname').value.trim();
+    const satisfactionInput = form.querySelector('input[name="satisfaction"]:checked');
+    const comment = document.getElementById('comment').value.trim();
+
+    if (!nickname) {
+      msg.textContent = 'ニックネームを入力してください';
+      msg.className = 'error';
+      return;
+    }
+    if (!satisfactionInput) {
+      msg.textContent = '満足度を選択してください';
+      msg.className = 'error';
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/responses', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          nickname,
+          satisfaction: Number(satisfactionInput.value),
+          comment,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '送信に失敗しました');
+
+      msg.textContent = '送信しました。ご協力ありがとうございました！';
+      msg.className = 'success';
+      form.reset();
+      paint(0);
+    } catch (err) {
+      msg.textContent = err.message || '送信に失敗しました';
+      msg.className = 'error';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
